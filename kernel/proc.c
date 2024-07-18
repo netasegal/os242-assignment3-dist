@@ -688,3 +688,58 @@ procdump(void)
     printf("\n");
   }
 }
+
+//Task 1
+uint64 map_shared_pages(struct proc* src_proc, struct proc* dst_proc, uint64 src_va, uint64 size){
+  uint64 src_start = PGROUNDDOWN(src_va); //first page in src pageable
+  uint64 src_end = PGROUNDUP(src_va + size); //last page in src pagetable
+  uint64 dst_va = PGROUNDUP(dst_proc->sz);
+  uint64 offset = src_va - src_start;
+
+  for(uint64 page = src_start, curr_va = dst_va; page < src_end; page+=PGSIZE, curr_va+=PGSIZE)
+  {
+    printf("page: %d\n", page);
+    pte_t* pte = walk(src_proc->pagetable, page, 0);
+    //walk not successful
+    if (pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0) return 0;
+
+    int ret = mappages(dst_proc->pagetable, curr_va, PGSIZE, PTE2PA(*pte), PTE_FLAGS(*pte) | PTE_S);
+    // mappages not successful
+    if( ret != 0) return 0;
+
+    //update dst proc size
+    dst_proc->sz += PGSIZE;
+  }
+
+  return (dst_va + offset);
+}
+
+uint64 unmap_shared_pages(struct proc* p, uint64 addr, uint64 size)
+{
+  uint64 va_start = PGROUNDDOWN(addr); // up or down
+  uint64 va_end = addr + size;
+
+  for(uint64 page = va_start; page < va_end; page+=PGSIZE)
+  {
+    pte_t* pte = walk(p->pagetable, page, 0);
+    //walk not successful
+    if (pte == 0 || (*pte & PTE_V) == 0 || (*pte & PTE_U) == 0 || (*pte & PTE_S) == 0) return -1;
+
+    uvmunmap(p->pagetable, page, 1, 1);
+
+    p->sz -= PGSIZE;
+  }
+
+  return 0;
+}
+
+struct proc* find_proc(int pid)
+{
+    struct proc* p;
+
+    for(p = proc; p < &proc[NPROC]; p++)
+    {
+      if(p->pid == pid && p->state != UNUSED) return p;
+    }
+    return 0;
+}
