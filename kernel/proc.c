@@ -691,6 +691,7 @@ procdump(void)
 
 //Task 1
 uint64 map_shared_pages(struct proc* src_proc, struct proc* dst_proc, uint64 src_va, uint64 size){
+  acquire(&src_proc->lock); 
   uint64 src_start = PGROUNDDOWN(src_va); //first page in src pageable
   uint64 src_end = PGROUNDUP(src_va + size); //last page in src pagetable
   uint64 dst_va = PGROUNDUP(dst_proc->sz);
